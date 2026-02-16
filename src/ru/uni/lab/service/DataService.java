@@ -120,92 +120,189 @@ public class DataService {
     private void generateInsights() {
         insights.clear();
         if (allRecords.isEmpty()) return;
-        
-        insights.add("=== АВТОМАТИЧЕСКИЙ АНАЛИЗ ТЕЛЕМЕТРИИ ===");
-        
-        // 1. Top non-normal parameters
-        Map<Integer, Integer> errorCounts = new HashMap<>();
-        for (TmRecord rec : allRecords) {
-            if (rec.getAttribute() != 0) { // 0 is Normal
-                errorCounts.merge(rec.getParameterNumber(), 1, Integer::sum);
+
+        long dataCount = getRecordCount();
+        long svcCount = getServiceMessageCount();
+        long totalCount = dataCount + svcCount;
+        int uniqueInFile = getUniqueParameters().size();
+        int knownInXml = getAllKnownParameters().size();
+
+        // Time range (data records only)
+        long minTime = Long.MAX_VALUE;
+        long maxTime = Long.MIN_VALUE;
+        for (TmRecord r : allRecords) {
+            long t = r.getTime();
+            if (t < minTime) minTime = t;
+            if (t > maxTime) maxTime = t;
+        }
+
+        insights.add("Сводка загрузки");
+        insights.add(String.format("• Записей: %d (полезных %d, служебных %d)", totalCount, dataCount, svcCount));
+        insights.add(String.format("• Уникальных параметров в файле: %d", uniqueInFile));
+        insights.add(String.format("• Параметров в XML: %d", knownInXml));
+        if (dataCount > 0) {
+            insights.add(String.format("• Время (по полезным): %s … %s (%.1f мин)",
+                    formatTime(minTime), formatTime(maxTime), (maxTime - minTime) / 60000.0));
+        }
+
+        // Mode overview (based on parsed mode change messages applied to data records)
+        Map<Integer, Long> modeCounts = new HashMap<>();
+        int modeSegments = 0;
+        Integer prevMode = null;
+        for (TmRecord r : allRecords) {
+            int m = r.getSessionModeNumber();
+            modeCounts.merge(m, 1L, Long::sum);
+            if (prevMode == null || m != prevMode) {
+                modeSegments++;
+                prevMode = m;
             }
         }
-        
-        if (!errorCounts.isEmpty()) {
-            insights.add("\n[!] ТОП СИСТЕМ С ОТКЛОНЕНИЯМИ:");
-            errorCounts.entrySet().stream()
-                .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
+        long nonNp = allRecords.stream().filter(r -> r.getSessionModeNumber() != 1).count();
+        insights.add("");
+        insights.add("Режимы (по «смена режима»)");
+        insights.add(String.format("• Сегментов: %d", modeSegments));
+        insights.add(String.format("• Записей вне НП: %d (%.2f%%)", nonNp, dataCount == 0 ? 0.0 : (100.0 * nonNp / dataCount)));
+        // Show top modes by count
+        modeCounts.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
                 .limit(5)
-                .forEach(e -> {
-                    String name = getParameterName(e.getKey());
-                    insights.add(String.format("   • %s (ID: %d): %d событий 'Не норма'", name, e.getKey(), e.getValue()));
-                });
-        } else {
-            insights.add("\n[OK] Все системы работают в штатном режиме. Отклонений не найдено.");
+                .forEach(e -> insights.add(String.format("  - %s: %d", modeName(e.getKey()), e.getValue())));
+
+        // Deviations overview
+        Map<Integer, Integer> deviationByParam = new HashMap<>();
+        Map<Integer, Integer> deviationByAttr = new HashMap<>();
+        long deviationsTotal = 0;
+        for (TmRecord rec : allRecords) {
+            int attr = rec.getAttribute();
+            if (attr != 0) {
+                deviationsTotal++;
+                deviationByParam.merge(rec.getParameterNumber(), 1, Integer::sum);
+                deviationByAttr.merge(attr, 1, Integer::sum);
+            }
         }
-        
-        // 2. Time gaps
-        insights.add("\n[i] АНАЛИЗ ВРЕМЕННОЙ ШКАЛЫ:");
+
+        insights.add("");
+        insights.add("Отклонения (attribute != 0)");
+        if (deviationsTotal == 0) {
+            insights.add("• Отклонений не найдено");
+        } else {
+            insights.add(String.format("• Всего событий: %d (%.2f%% от полезных)",
+                    deviationsTotal, dataCount == 0 ? 0.0 : (100.0 * deviationsTotal / dataCount)));
+
+            // Attribute breakdown
+            deviationByAttr.entrySet().stream()
+                    .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+                    .limit(5)
+                    .forEach(e -> insights.add(String.format("  - %s: %d", getAttributeText(e.getKey()), e.getValue())));
+
+            // Top affected params
+            insights.add("• Топ параметров по числу отклонений:");
+            deviationByParam.entrySet().stream()
+                    .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
+                    .limit(8)
+                    .forEach(e -> {
+                        String name = getParameterName(e.getKey());
+                        insights.add(String.format("  - %s (ID: %d): %d", name, e.getKey(), e.getValue()));
+                    });
+        }
+
+        // Time gaps (data only)
+        insights.add("");
+        insights.add("Временная шкала");
+        List<TmRecord> sorted = new ArrayList<>(allRecords);
+        sorted.sort(Comparator.comparingLong(TmRecord::getTime));
+
         long prevTime = -1;
         int gapCount = 0;
         long maxGap = 0;
-        
-        // Sort by time to be sure
-        List<TmRecord> sorted = new ArrayList<>(allRecords);
-        sorted.sort(Comparator.comparingLong(TmRecord::getTime));
-        
+        long maxGapStart = -1;
+        long maxGapEnd = -1;
+
         for (TmRecord rec : sorted) {
             if (prevTime != -1) {
                 long diff = rec.getTime() - prevTime;
                 // Gap > 1 minute (60000 ms) and not a day wraparound
-                if (diff > 60000 && diff < 80000000) { 
+                if (diff > 60000 && diff < 80000000) {
                     gapCount++;
-                    if (diff > maxGap) maxGap = diff;
+                    if (diff > maxGap) {
+                        maxGap = diff;
+                        maxGapStart = prevTime;
+                        maxGapEnd = rec.getTime();
+                    }
                 }
             }
             prevTime = rec.getTime();
         }
-        
-        if (gapCount > 0) {
-            insights.add(String.format("   • Обнаружено разрывов связи (>1 мин): %d", gapCount));
-            insights.add(String.format("   • Максимальный перерыв: %.1f мин", maxGap / 60000.0));
+        if (gapCount == 0) {
+            insights.add("• Разрывов > 1 мин не найдено");
         } else {
-            insights.add("   • Поток данных непрерывен.");
+            insights.add(String.format("• Разрывы > 1 мин: %d", gapCount));
+            insights.add(String.format("• Макс. разрыв: %.1f мин (%s → %s)",
+                    maxGap / 60000.0, formatTime(maxGapStart), formatTime(maxGapEnd)));
         }
-        
-        // 3. Stats for numeric params
-        insights.add("\n[i] СТАТИСТИКА ПО КЛЮЧЕВЫМ ПАРАМЕТРАМ:");
-        int numericParams = 0;
-        for (Integer paramId : getUniqueParameters().keySet()) {
-            List<TmRecord> recs = getRecordsForParameter(paramId);
+
+        // Helpful “where to look” sections
+        insights.add("");
+        insights.add("Куда смотреть (быстрые подсказки)");
+
+        // Top parameters by record count
+        Map<Integer, Long> byCount = allRecords.stream()
+                .collect(Collectors.groupingBy(TmRecord::getParameterNumber, Collectors.counting()));
+        insights.add("• Топ параметров по числу измерений:");
+        byCount.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .limit(8)
+                .forEach(e -> insights.add(String.format("  - %s (ID: %d): %d",
+                        getParameterName(e.getKey()), e.getKey(), e.getValue())));
+
+        // Numeric stats for top dense numeric params
+        class NumAcc {
+            long count = 0;
             double sum = 0;
             double min = Double.MAX_VALUE;
             double max = -Double.MAX_VALUE;
-            int count = 0;
-            
-            for (TmRecord r : recs) {
-                double val = Double.NaN;
-                if (r instanceof TmLong) val = ((TmLong) r).getValue();
-                else if (r instanceof TmDouble) val = ((TmDouble) r).getValue();
-                
-                if (!Double.isNaN(val)) {
-                    sum += val;
-                    if (val < min) min = val;
-                    if (val > max) max = val;
-                    count++;
-                }
-            }
-            
-            if (count > 10 && numericParams < 3) { // Show first 3 numeric params as sample
-                String name = getParameterName(paramId);
-                // Simple heuristic to avoid showing IDs or codes as stats
-                if (Math.abs(max - min) > 0.0001) {
-                    insights.add(String.format("   • %s: Min=%.2f, Max=%.2f, Avg=%.2f", name, min, max, sum/count));
-                    numericParams++;
-                }
+            String name = "";
+            String dim = "";
+            void add(double v, String n, String d) {
+                count++;
+                sum += v;
+                if (v < min) min = v;
+                if (v > max) max = v;
+                if (name.isEmpty() && n != null) name = n;
+                if (dim.isEmpty() && d != null) dim = d;
             }
         }
-        
+
+        Map<Integer, NumAcc> numeric = new HashMap<>();
+        for (TmRecord r : allRecords) {
+            double v = Double.NaN;
+            if (r instanceof TmLong) v = ((TmLong) r).getValue();
+            else if (r instanceof TmDouble) v = ((TmDouble) r).getValue();
+            if (Double.isNaN(v)) continue;
+
+            NumAcc acc = numeric.computeIfAbsent(r.getParameterNumber(), k -> new NumAcc());
+            acc.add(v, r.getParameterName(), r.getDimension());
+        }
+
+        List<Map.Entry<Integer, NumAcc>> topNumeric = numeric.entrySet().stream()
+                .filter(e -> e.getValue().count >= 20)
+                .filter(e -> Math.abs(e.getValue().max - e.getValue().min) > 1e-9)
+                .sorted((a, b) -> Long.compare(b.getValue().count, a.getValue().count))
+                .limit(5)
+                .collect(Collectors.toList());
+
+        if (!topNumeric.isEmpty()) {
+            insights.add("• Числовые параметры (min/max/avg) по самым плотным:");
+            for (Map.Entry<Integer, NumAcc> e : topNumeric) {
+                NumAcc a = e.getValue();
+                String dim = (a.dim == null || a.dim.isBlank()) ? "" : (" " + a.dim);
+                insights.add(String.format("  - %s (ID: %d): min=%.3f, max=%.3f, avg=%.3f%s (n=%d)",
+                        a.name.isEmpty() ? getParameterName(e.getKey()) : a.name,
+                        e.getKey(),
+                        a.min, a.max, (a.sum / a.count), dim, a.count));
+            }
+        }
+
         logEvent("Analysis complete. Generated " + insights.size() + " insight lines.");
     }
     
@@ -260,5 +357,20 @@ public class DataService {
             case 10: return "Зашкаливание";
             default: return String.valueOf(attribute);
         }
+    }
+
+    private String formatTime(long msFromStartOfDay) {
+        long hours = msFromStartOfDay / 3600000;
+        long minutes = (msFromStartOfDay % 3600000) / 60000;
+        long seconds = (msFromStartOfDay % 60000) / 1000;
+        long ms = msFromStartOfDay % 1000;
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms);
+    }
+
+    private String modeName(int mode) {
+        if (mode == 1) return "НП";
+        if (mode == 0) return "недостоверный режим";
+        if (mode >= 2 && mode <= 8) return "ВП(" + mode + ")";
+        return "режим(" + mode + ")";
     }
 }
