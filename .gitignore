@@ -1,0 +1,10 @@
+TODO.md
+tz.md
+
+# Build output (compiled classes)
+/out/
+*.class
+
+# OS / editor noise
+Thumbs.db
+.DS_Store

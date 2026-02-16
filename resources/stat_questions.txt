@@ -1,0 +1,55 @@
+# Формат строк:
+# id|title|source_ref
+#
+# Канонический источник: docs/source/kursovye_works_2025_sem3.md (список заданий по телеметрии).
+# Вопросы, не относящиеся к телеметрии (игры/тетрис/майнкрафт и т.п.), намеренно исключены.
+
+temp_params_count|Количество температурных параметров (Т***)|kursovye_works_2025_sem3.md
+svc_records_count_total|Количество служебных записей (param=0xFFFF)|kursovye_works_2025_sem3.md
+svc_records_count_mode_change|Количество служебных записей типа «смена режима»|kursovye_works_2025_sem3.md
+data_records_count|Количество «полезных» записей|kursovye_works_2025_sem3.md
+svc_mode_change_segments_np|Количество «кусков» смены режима со значением «режим НП»|kursovye_works_2025_sem3.md
+svc_mode_change_segments_invalid|Количество «кусков» смены режима со значением «недостоверный режим»|kursovye_works_2025_sem3.md
+point_records_len_lt_4|Количество записей типа Point с длиной массива < 4 байт|kursovye_works_2025_sem3.md
+records_count_non_np_mode|Количество ТМ-записей в любом режиме, кроме НП|kursovye_works_2025_sem3.md
+param_min_records|Параметр с наименьшим количеством ТМ-записей (и сколько)|kursovye_works_2025_sem3.md
+params_with_two_records|Параметры с двумя ТМ-записями|kursovye_works_2025_sem3.md
+mode_segments_counts_np_vp33|Для каждого «куска» смены режима: НП и ВП-33 (кол-во записей)|kursovye_works_2025_sem3.md
+check_total_params_vs_sum_types|Проверка: число разных параметров = сумма разных параметров по типам|kursovye_works_2025_sem3.md
+text_params_count_in_xml|Количество текстовых параметров по XML (наличие Textes)|kursovye_works_2025_sem3.md
+present_params_sorted_by_name|Параметры, представленные в KNP: индексы и номера, по алфавиту|kursovye_works_2025_sem3.md
+svc_records_count_error|Количество служебных записей типа «ошибка»|kursovye_works_2025_sem3.md
+code_params_len_lt_8|Число параметров типа Code с длиной кода < 8|kursovye_works_2025_sem3.md
+dimensions_most_frequent|Наиболее часто встречающиеся физические размерности|kursovye_works_2025_sem3.md
+all_params_sorted_by_name|Все параметры борта по XML: индексы и номера, по алфавиту|kursovye_works_2025_sem3.md
+mode_segments_chronological_counts|Хронологически: <режим - кол-во записей в текущем куске>|kursovye_works_2025_sem3.md
+svc_mode_change_segments_vp_2_8|Количество «кусков» смены режима с режимом в диапазоне 2..8 (ВП)|kursovye_works_2025_sem3.md
+svc_records_count_start_or_end|Количество служебных записей «начало сеанса» + «конец сеанса»|kursovye_works_2025_sem3.md
+point_params_len_gt_4|Число параметров типа Point, где встречается длина массива > 4|kursovye_works_2025_sem3.md
+svc_records_count_empty|Количество служебных записей типа «пустая посылка»|kursovye_works_2025_sem3.md
+distinct_double_params_count|Число различных параметров типа Double|kursovye_works_2025_sem3.md
+distinct_params_count|Число различных параметров|kursovye_works_2025_sem3.md
+distinct_code_params_count|Число различных параметров типа Code|kursovye_works_2025_sem3.md
+distinct_long_params_count|Число различных параметров типа Long|kursovye_works_2025_sem3.md
+distinct_point_params_count|Число различных параметров типа Point|kursovye_works_2025_sem3.md
+long_records_count|Количество записей типа Long|kursovye_works_2025_sem3.md
+double_records_count|Количество записей типа Double|kursovye_works_2025_sem3.md
+svc_records_count_current_time|Количество служебных записей типа «текущее время»|kursovye_works_2025_sem3.md
+svc_records_count_total_alt|Количество служебных записей (дубль, для сверки)|kursovye_works_2025_sem3.md
+svc_mode_change_segments_not_np|Количество «кусков» смены режима с любым режимом, кроме НП|kursovye_works_2025_sem3.md
+point_records_count|Количество записей типа Point|kursovye_works_2025_sem3.md
+dimensions_most_rare|Наиболее редко встречающиеся физические размерности|kursovye_works_2025_sem3.md
+code_params_len_gt_8|Число параметров типа Code с длиной кода > 8|kursovye_works_2025_sem3.md
+records_count_total|Общее количество записей (полезные + служебные)|kursovye_works_2025_sem3.md
+temp_params_max_records|Температурные параметры с наибольшим количеством ТМ-записей|kursovye_works_2025_sem3.md
+code_records_count|Количество записей типа Code|kursovye_works_2025_sem3.md
+
+# Дополнительно из лабораторных (S, S_TM, S_Sluz, S_XML, Q0..Q3)
+s_total|S: общее количество TM-записей (полезные+служебные)|labs_tcup_2026_sem8.md
+s_tm|S_TM: количество полезных TM-записей|labs_tcup_2026_sem8.md
+s_sluz|S_Sluz: количество служебных TM-записей|labs_tcup_2026_sem8.md
+s_xml|S_XML: количество параметров в XML|labs_tcup_2026_sem8.md
+q0_long_params_distinct|Q0_File: число различных полезных параметров типа Long|labs_tcup_2026_sem8.md
+q1_double_params_distinct|Q1_File: число различных полезных параметров типа Double|labs_tcup_2026_sem8.md
+q2_code_params_distinct|Q2_File: число различных полезных параметров типа Code|labs_tcup_2026_sem8.md
+q3_point_params_distinct|Q3_File: число различных полезных параметров типа Point|labs_tcup_2026_sem8.md

@@ -10,6 +10,9 @@ public abstract class TmRecord {
     private String dimension;
     private int attribute;
     private int valueType;
+    // Session mode number derived from service messages (type "смена режима").
+    // 1 == НП, 2..8 == ВП (см. документацию), 0 == недостоверный.
+    private int sessionModeNumber = 1;
 
     public TmRecord(int parameterNumber, long time, int attribute, int valueType) {
         this.parameterNumber = parameterNumber;
@@ -64,6 +67,14 @@ public abstract class TmRecord {
 
     public void setValueType(int valueType) {
         this.valueType = valueType;
+    }
+
+    public int getSessionModeNumber() {
+        return sessionModeNumber;
+    }
+
+    public void setSessionModeNumber(int sessionModeNumber) {
+        this.sessionModeNumber = sessionModeNumber;
     }
     
     public abstract String getValueAsString();

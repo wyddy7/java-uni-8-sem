@@ -1,6 +1,7 @@
 package ru.uni.lab.service;
 
 import ru.uni.lab.model.ParameterInfo;
+import ru.uni.lab.model.ServiceMessage;
 import ru.uni.lab.model.TmDouble;
 import ru.uni.lab.model.TmLong;
 import ru.uni.lab.model.TmRecord;
@@ -14,6 +15,7 @@ public class DataService {
     private static DataService instance;
     
     private List<TmRecord> allRecords;
+    private List<ServiceMessage> serviceMessages;
     private Map<Integer, ParameterInfo> paramInfoMap;
     private Map<Integer, String> dimensions;
     private List<String> systemLog;
@@ -21,6 +23,7 @@ public class DataService {
     
     private DataService() {
         allRecords = Collections.emptyList();
+        serviceMessages = Collections.emptyList();
         paramInfoMap = Collections.emptyMap();
         dimensions = Collections.emptyMap();
         systemLog = new ArrayList<>();
@@ -69,8 +72,10 @@ public class DataService {
         // Parse KNP
         logEvent("Reading Binary KNP: " + knpFile.getName());
         KnpParser knpParser = new KnpParser();
-        List<TmRecord> records = knpParser.parse(knpFile);
-        logEvent("Binary parsing complete. Records found: " + records.size());
+        KnpParseResult parseResult = knpParser.parseWithServiceMessages(knpFile);
+        List<TmRecord> records = parseResult.getDataRecords();
+        this.serviceMessages = parseResult.getServiceMessages();
+        logEvent("Binary parsing complete. Data records: " + records.size() + ", service messages: " + serviceMessages.size());
         
         // Post-process records to enrich with names and dimension strings
         for (TmRecord record : records) {
@@ -102,6 +107,14 @@ public class DataService {
         logEvent("FILE CLOSED. All data residing in RAM. Memory used: " + (memory / 1024 / 1024) + " MB");
         
         generateInsights();
+    }
+
+    public List<ServiceMessage> getServiceMessages() {
+        return serviceMessages;
+    }
+
+    public int getServiceMessageCount() {
+        return serviceMessages != null ? serviceMessages.size() : 0;
     }
     
     private void generateInsights() {

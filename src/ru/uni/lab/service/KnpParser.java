@@ -1,6 +1,11 @@
 package ru.uni.lab.service;
 
-import ru.uni.lab.model.*;
+import ru.uni.lab.model.ServiceMessage;
+import ru.uni.lab.model.TmCode;
+import ru.uni.lab.model.TmDouble;
+import ru.uni.lab.model.TmLong;
+import ru.uni.lab.model.TmPoint;
+import ru.uni.lab.model.TmRecord;
 
 import java.io.DataInputStream;
 import java.io.EOFException;
@@ -14,8 +19,21 @@ import java.util.List;
 
 public class KnpParser {
 
+    /**
+     * Backward-compatible parse (returns only data records; service messages are ignored).
+     */
     public List<TmRecord> parse(File file) throws IOException {
+        return parseWithServiceMessages(file).getDataRecords();
+    }
+
+    /**
+     * Parse KNP file and return both data records and service messages.
+     * Also assigns {@link ru.uni.lab.model.TmRecord#setSessionModeNumber(int)} based on service message type 4 (mode change).
+     */
+    public KnpParseResult parseWithServiceMessages(File file) throws IOException {
         List<TmRecord> records = new ArrayList<>();
+        List<ServiceMessage> serviceMessages = new ArrayList<>();
+        int currentModeNumber = 1; // By default, start of session is NП
         
         try (DataInputStream dis = new DataInputStream(new FileInputStream(file))) {
             while (dis.available() > 0) {
@@ -37,21 +55,47 @@ public class KnpParser {
                 
                 // Check for service message (0xFFFF)
                 if (paramNumber == 0xFFFF) {
-                    // Check message Type (Byte 6)
+                    long time = bb.getInt(2) & 0xFFFFFFFFL;
                     int msgType = bb.get(6) & 0xFF;
-                    
-                    // Assuming Type 1 is "Start Session" (32 bytes) and others are 16 bytes.
-                    // This is deduced from file analysis showing Type 1 is 32 bytes and Type 2,5 are 16 bytes.
+                    int valueType = bb.get(7) & 0xFF;
+
+                    byte[] payload;
                     if (msgType == 1) {
+                        // Start session: total 32 bytes (payload 24 bytes from offset 8)
                         byte[] rest = new byte[16];
                         try {
                             dis.readFully(rest);
                         } catch (EOFException e) {
-                            break; // EOF inside service message
+                            break;
                         }
+                        payload = new byte[24];
+                        System.arraycopy(header, 8, payload, 0, 8);
+                        System.arraycopy(rest, 0, payload, 8, 16);
+                    } else {
+                        // Other service messages: 16 bytes total (payload 8 bytes from offset 8)
+                        payload = new byte[8];
+                        System.arraycopy(header, 8, payload, 0, 8);
                     }
-                    // For other types (e.g. 2, 5), we ALREADY read 16 bytes, and that's it.
-                    continue; // Skip service message
+
+                    Integer modeNumber = null;
+                    Integer errorNumber = null;
+                    Integer daysFrom1980 = null;
+
+                    if (msgType == 4) {
+                        // Mode number is stored as 32-bit int (docs show it in bytes 12-15 of the 16-byte record)
+                        modeNumber = bb.getInt(12);
+                        currentModeNumber = modeNumber;
+                    } else if (msgType == 6) {
+                        errorNumber = bb.getInt(12);
+                    } else if (msgType == 5) {
+                        daysFrom1980 = bb.getInt(12);
+                    } else if (msgType == 2) {
+                        // Docs: current time/date in days from 1980 (often in bytes 8-11). We store best-effort.
+                        daysFrom1980 = bb.getInt(8);
+                    }
+
+                    serviceMessages.add(new ServiceMessage(time, msgType, valueType, payload, modeNumber, errorNumber, daysFrom1980));
+                    continue;
                 }
                 
                 // 2-5: Time (unsigned int -> long)
@@ -122,11 +166,12 @@ public class KnpParser {
                 
                 if (record != null) {
                     record.setDimension(String.valueOf(dimensionId));
+                    record.setSessionModeNumber(currentModeNumber);
                     records.add(record);
                 }
             }
         }
         
-        return records;
+        return new KnpParseResult(records, serviceMessages);
     }
 }
