@@ -1,13 +1,49 @@
-cd "D:\D\Papka\uni\info.indeed\8 semestr\korolkova"
+# Java Uni 8 sem — приложение для просмотра телеметрии (ТМ)
 
-rem Компиляция всех исходников в папку out
+Графическое приложение на Java (Swing) для загрузки и отображения данных из файлов телеметрии (.knp), размерностей (dimens.ion) и справочника параметров (XML).
+
+## Требования
+
+- **Java** (JDK 8 или выше)
+- Все команды выполняются **из корня проекта** (папка, где лежит этот README).
+
+## Сборка и запуск
+
+### Компиляция
+
+```batch
 javac -encoding UTF-8 -d out ^
   src\ru\uni\lab\app\Main.java ^
   src\ru\uni\lab\model\*.java ^
   src\ru\uni\lab\service\*.java ^
   src\ru\uni\lab\ui\*.java
+```
 
-javac -encoding UTF-8 -d out src\ru\uni\lab\app\Main.java src\ru\uni\lab\model\*.java src\ru\uni\lab\service\*.java src\ru\uni\lab\ui\*.java                                                                                 
+Одной строкой (Windows):
 
-rem Запуск приложения
+```batch
+javac -encoding UTF-8 -d out src\ru\uni\lab\app\Main.java src\ru\uni\lab\model\*.java src\ru\uni\lab\service\*.java src\ru\uni\lab\ui\*.java
+```
+
+### Запуск
+
+```batch
 java -cp out ru.uni.lab.app.Main
+```
+
+## Структура проекта
+
+| Папка / файл | Назначение |
+|--------------|------------|
+| `src/ru/uni/lab/` | Исходный код (app, model, service, ui) |
+| `out/` | Скомпилированные классы (создаётся при сборке) |
+| `docs/` | Документация по курсу, лабам, структуре ТМИ |
+| `resources/` | Вспомогательные файлы (вопросы для статистики и т.п.) |
+
+## Кратко о функциональности
+
+- Загрузка входных файлов **один раз** (KNP, dimens.ion, XML) и хранение в памяти.
+- Список параметров слева, выбор параметра и отображение метрик в отдельной области.
+- Графики по выбранному параметру, таблица значений, лог и статистика по файлу.
+
+Подробности по архитектуре — в `about.md`.
